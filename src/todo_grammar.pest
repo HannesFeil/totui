@@ -1,0 +1,25 @@
+new_line  = _{ NEWLINE | EOI }
+space     = _{ " " }
+word_char = _{ !space ~ !new_line ~ !"\t" ~ ANY }
+
+completed = { "x" }
+priority  = { "(" ~ ASCII_ALPHA_UPPER ~ ")" }
+date      = { ASCII_DIGIT{4} ~ "-" ~ ASCII_DIGIT{2} ~ "-" ~ ASCII_DIGIT{2} }
+
+context = { "@" ~ word_char+ }
+project = { "+" ~ word_char+ }
+rec     = { "rec:" ~ ASCII_DIGIT+ ~ ("d" | "w" | "m" | "y") }
+due     = { "due:" ~ date }
+pri     = { "pri:" ~ ASCII_ALPHA_UPPER }
+t       = { "t:" ~ date }
+
+tag     = { (project | context | rec | pri | t | due) ~ &(space | new_line) }
+content = { tag? ~ (space ~ tag | !new_line ~ ANY)+ }
+
+item = {
+    ((completed | priority) ~ space)? ~ (date ~ space)? ~ (date ~ space)? ~ content ~ new_line
+}
+
+main = {
+    SOI ~ item* ~ &EOI
+}
