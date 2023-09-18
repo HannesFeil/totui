@@ -13,11 +13,11 @@ due     = { "due:" ~ date }
 pri     = { "pri:" ~ ASCII_ALPHA_UPPER }
 t       = { "t:" ~ date }
 
-tag     = { (project | context | rec | pri | t | due) ~ &(space | new_line) }
+tag     = { (project | context | rec | pri | t | due) }
 content = { tag? ~ (space ~ tag | !new_line ~ ANY)+ }
 
 item = {
-    ((completed | priority) ~ space)? ~ (date ~ space)? ~ (date ~ space)? ~ content ~ new_line
+    ((priority ~ space) | (completed ~ space ~ (date ~ space)?))? ~ (date ~ space)? ~ content ~ new_line
 }
 
 main = {

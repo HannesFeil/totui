@@ -2,3 +2,31 @@
 (B) Schedule Goodwill t:5032-12-09 pickup +GarageSale @phone
 x 2000-11-14 3000-11-30 Post rec:1w signs around pri:B the neighborhood +GarageSale
 @GroceryStore Eskimo pies
+(A) this is a high priority task
+(B) this task has a +project and has a lower priority than the prior task
+2021-04-01 this task has a creation date and a context @context
+x 2021-04-01 2021-03-28 this is a completed task with a creation date and a completion date
+(A) 2020-02-20 due:2031-07-12 Thank Mom for the meatballs @phone
+(B) Schedule Goodwill due:2031-06-11 pickup +GarageSale @phone
+x 2000-11-14 3000-11-30 Post rec:1w signs around pri:B the neighborhood +GarageSale
+@GroceryStore Eskimo pies
+(A) this is a high priority task
+(B) this task has a +project and has a lower priority than the prior task
+2021-04-01 this task has a creation date and a context @context
+x 2021-04-01 2021-03-28 this is a completed task with a creation date and a completion date
+(A) 2020-02-20 due:2031-06-11 Thank Lom for the meatballs @phone
+(B) Schedule due:2031-06-11 Goodwill t:5032-12-09 pickup +GarageSale @phone
+x 2000-11-14 3000-11-30 Post rec:1w signs around pri:B the neighborhood +GarageSale
+@GroceryStore Eskimo pies
+(A) this is a gigh priority task
+(B) this task has a +project and has a lower priority than the prior task
+2021-04-01 this task has a creation date and a context @context
+x 2021-04-01 2021-03-28 this is a completed task with a creation date and a completion date
+(A) 2020-02-20 due:2031-04-11 Thank Mom for the meatballs @phon
+(B) Schedule due:2031-06-11 Goodwill t:5032-12-08 pickup +GarageSale @phone
+x 2000-11-14 3000-11-30 Post rec:1w signs around pri:B the neighborhood +GarageSale
+@GroceryStore Eskimo pies
+(A) this is a high priorit task
+(B) this task has a +project and has a lower priority than the prior task
+2021-04-01 this task has a creation date and a context @context
+x 2021-04-01 2021-03-28 this is a completed task with a creation date and a completion date
