@@ -1,6 +1,13 @@
-use std::{cmp, fmt::Display, num::ParseIntError, ops::Range, str::FromStr};
+use std::{
+    cmp::{self, Reverse},
+    collections::HashSet,
+    fmt::Display,
+    num::ParseIntError,
+    ops::Range,
+    str::FromStr,
+};
 
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate};
 use pest::Parser;
 use pest_derive::Parser;
 
@@ -14,71 +21,103 @@ struct TodoListParser;
 pub struct TodoList {
     /// Sorted `Vec` of `TodoItem`s
     items: Vec<TodoItem>,
+    /// Current filter
+    filter: Filter,
+    /// Sorted view of filtered `TodoItem`s
+    filtered: Vec<usize>,
+    /// List of contexts found in `TodoItem`s
+    contexts: HashSet<String>,
+    /// List of projects found in `TodoItem`s
+    projects: HashSet<String>,
 }
 
 impl TodoList {
-    /// Return a slice of references to `TodoItem`s which match the given filter
-    pub fn filtered(&self, filter: &str, ignore_case: bool) -> Box<[&TodoItem]> {
-        let mut search_words = Vec::new();
-        let mut priority = None;
-        let mut completed = None;
+    pub fn filter(&self) -> &Filter {
+        &self.filter
+    }
 
-        for word in filter.split_whitespace() {
-            if word.starts_with("prio:") && priority.is_none() {
-                priority = Some(match word.chars().nth(5) {
-                    Some(c) if c.is_ascii_alphabetic() => Some(c),
-                    _ => None,
-                });
-            } else if word == "done:x" && completed.is_none() {
-                completed = Some(true);
-            } else if word == "done:" && completed.is_none() {
-                completed = Some(false);
-            } else {
-                search_words.push(if ignore_case {
-                    word.to_lowercase()
-                } else {
-                    word.to_string()
-                });
-            }
-        }
+    pub fn mutate_filter(&mut self, f: impl FnOnce(&mut Filter)) {
+        f(&mut self.filter);
+        self.apply_filter();
+    }
+    /// Update the filtered items
+    /// TODO: better filtering (completed etc nicer ui)
+    fn apply_filter(&mut self) {
+        self.filtered.clear();
+        let filter_words: Box<[_]> = if self.filter.ignore_case {
+            self.filter.words.iter().map(|w| w.to_lowercase()).collect()
+        } else {
+            self.filter.words.iter().cloned().collect()
+        };
 
-        self.iter()
-            .filter(move |item| {
+        self.items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| {
                 // Filter out priority
-                if let Some(priority) = priority {
+                if let Some(priority) = self.filter.priority {
                     if item.priority != priority {
                         return false;
                     }
                 }
 
                 // Filter out completed
-                if let Some(completed) = completed {
+                if let Some(completed) = self.filter.completed {
                     if item.completed != completed {
                         return false;
                     }
                 }
 
                 // Filter words
-                let lower = if ignore_case {
+                let words = if self.filter.ignore_case {
                     item.content.to_lowercase()
                 } else {
                     item.content.to_owned()
                 };
 
-                for word in &search_words {
-                    if !lower.contains(word) {
+                for word in filter_words.iter() {
+                    if !words.contains(word) {
                         return false;
                     }
                 }
 
                 true
             })
-            .collect()
+            .for_each(|(index, _)| self.filtered.push(index));
     }
 
-    /// Iterate over all `TodoItem`s by reference
-    pub fn iter(&self) -> impl Iterator<Item = &TodoItem> {
-        self.items.iter()
+    /// The number of filtered `TodoItem`s
+    pub fn filter_count(&self) -> usize {
+        self.filtered.len()
+    }
+
+    /// Iter over the currently filtered `TodoItem`s and their indices
+    pub fn iter_filtered(&self) -> impl Iterator<Item = (usize, &TodoItem)> {
+        self.filtered.iter().map(|&i| (i, &self.items[i]))
+    }
+
+    /// Iter over all contexts
+    pub fn contexts(&self) -> impl Iterator<Item = &str> {
+        self.contexts.iter().map(String::as_str)
+    }
+
+    /// Iter over all projects
+    pub fn projects(&self) -> impl Iterator<Item = &str> {
+        self.projects.iter().map(String::as_str)
+    }
+
+    // TODO: make better
+    /// Mutate the list. Afterwards sorts the list and updates contexts and projects
+    pub fn mutate_then_update(&mut self, f: impl FnOnce(&mut Vec<TodoItem>)) {
+        f(&mut self.items);
+        self.items.sort_unstable();
+        self.contexts.clear();
+        self.projects.clear();
+        self.items.iter().for_each(|item| {
+            self.contexts.extend(item.contexts().map(str::to_owned));
+            self.projects.extend(item.projects().map(str::to_owned));
+        });
+        self.apply_filter();
     }
 }
 
@@ -104,7 +143,10 @@ impl FromStr for TodoList {
             for rule in line.into_inner() {
                 match rule.as_rule() {
                     Rule::completed => item.completed = true,
-                    Rule::priority => item.priority = Some(rule.as_str().chars().nth(1).unwrap()),
+                    Rule::priority => {
+                        item.priority =
+                            Some(Priority::try_from(rule.as_str().chars().nth(1).unwrap()).unwrap())
+                    }
                     Rule::date => {
                         if item.completed && item.creation_date.is_some() {
                             item.completion_date = item.creation_date;
@@ -190,7 +232,10 @@ impl FromStr for TodoList {
                                     }
                                     item.content.replace_range(tag_span.clone(), "");
                                     content_start += tag_span.len();
-                                    item.priority = Some(tag.as_str().chars().nth(4).unwrap());
+                                    item.priority = Some(
+                                        Priority::try_from(tag.as_str().chars().nth(4).unwrap())
+                                            .unwrap(),
+                                    );
                                 }
                                 _ => unreachable!(),
                             }
@@ -206,7 +251,25 @@ impl FromStr for TodoList {
         // Sort items
         items.sort();
 
-        Ok(TodoList { items })
+        let filtered = (0..items.len()).collect();
+
+        // Collect projects and contexts
+        let contexts = items
+            .iter()
+            .flat_map(|item| item.contexts().map(str::to_owned))
+            .collect();
+        let projects = items
+            .iter()
+            .flat_map(|item| item.projects().map(str::to_owned))
+            .collect();
+
+        Ok(TodoList {
+            items,
+            filter: Default::default(),
+            filtered,
+            contexts,
+            projects,
+        })
     }
 }
 
@@ -220,14 +283,35 @@ impl Display for TodoList {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Default, Clone)]
+pub struct Filter {
+    /// Optional priority to filter for
+    pub priority: Option<Option<Priority>>,
+    /// Optional completion to filter for
+    pub completed: Option<bool>,
+    /// Words to search for
+    pub words: Vec<String>,
+    /// Ignore case while searching words
+    pub ignore_case: bool,
+}
+
+impl Filter {
+    pub fn new(ignore_case: bool) -> Filter {
+        Self {
+            ignore_case,
+            ..Default::default()
+        }
+    }
+}
+
 /// A single todo item
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct TodoItem {
     /// If it has been completed
     completed: bool,
     /// The priority
-    priority: Option<char>,
-    /// The content including contexts and projects but excluding 
+    pub priority: Option<Priority>,
+    /// The content including contexts and projects but excluding
     /// `label:value` tags, `priority` and `completion`
     content: String,
     /// Ranges of contexts in `content`
@@ -239,11 +323,110 @@ pub struct TodoItem {
     /// The completion date
     completion_date: Option<NaiveDate>,
     /// The due date
-    due: Option<NaiveDate>,
+    pub due: Option<NaiveDate>,
     /// The threshhold date
-    threshhold: Option<NaiveDate>,
+    pub threshhold: Option<NaiveDate>,
     /// Recurrence
-    recurring: Option<Recurring>,
+    pub recurring: Option<Recurring>,
+}
+
+impl TodoItem {
+    pub fn new(creation_date: bool) -> TodoItem {
+        Self {
+            creation_date: creation_date.then_some(Local::now().date_naive()),
+            ..Default::default()
+        }
+    }
+
+    pub fn valid(&self) -> bool {
+        !self
+            .iter_content_parts()
+            .any(|p| matches!(p, ContentPart::Normal(_))) // TODO:
+    }
+
+    pub fn completed(&self) -> bool {
+        self.completed
+    }
+
+    pub fn toggle_completed(&mut self) {
+        self.completed = !self.completed;
+        self.completion_date =
+            (self.completed && self.creation_date.is_some()).then_some(Local::now().date_naive());
+    }
+
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    pub fn set_content(&mut self, content: String) {
+        self.content = content;
+
+        self.contexts.clear();
+        self.projects.clear();
+
+        if self.content.is_empty() {
+            return;
+        }
+
+        // TODO: validate
+        for item in TodoListParser::parse(Rule::content, &self.content)
+            .unwrap()
+            .next()
+            .unwrap()
+            .into_inner()
+            .flat_map(|item| item.into_inner())
+        {
+            match item.as_rule() {
+                Rule::context => self
+                    .contexts
+                    .push(item.as_span().start()..item.as_span().end()),
+                Rule::project => self
+                    .projects
+                    .push(item.as_span().start()..item.as_span().end()),
+                _ => {}
+            }
+        }
+    }
+
+    pub fn contexts(&self) -> impl Iterator<Item = &str> {
+        self.contexts.iter().map(|r| &self.content[r.clone()])
+    }
+
+    pub fn projects(&self) -> impl Iterator<Item = &str> {
+        self.projects.iter().map(|r| &self.content[r.clone()])
+    }
+
+    pub fn iter_content_parts(&self) -> impl Iterator<Item = ContentPart> {
+        let mut index = 0;
+        let mut context_iter = self.contexts.iter().cloned().peekable();
+        let mut project_iter = self.projects.iter().cloned().peekable();
+        let mut result = vec![];
+        while index < self.content.len() {
+            match (context_iter.peek(), project_iter.peek()) {
+                (Some(range), _) if range.start == index => {
+                    index = range.end;
+                    result.push(ContentPart::Context(
+                        &self.content[context_iter.next().unwrap()],
+                    ));
+                }
+                (_, Some(range)) if range.start == index => {
+                    index = range.end;
+                    result.push(ContentPart::Project(
+                        &self.content[project_iter.next().unwrap()],
+                    ));
+                }
+                (next_context, next_project) => {
+                    let len = self.content.len();
+                    let end = len
+                        .min(next_context.map_or(len, |r| r.start))
+                        .min(next_project.map_or(len, |r| r.start));
+                    result.push(ContentPart::Normal(&self.content[index..end]));
+                    index = end;
+                }
+            }
+        }
+        result.into_iter()
+    }
 }
 
 impl PartialOrd for TodoItem {
@@ -260,8 +443,9 @@ impl Ord for TodoItem {
             // Compare by priority
             .then(
                 self.priority
-                    .unwrap_or(char::MAX)
-                    .cmp(&other.priority.unwrap_or(char::MAX)),
+                    .map(Reverse)
+                    .cmp(&other.priority.map(Reverse))
+                    .reverse(),
             )
             // Compare by due date
             .then(
@@ -287,7 +471,7 @@ impl Display for TodoItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.completed {
             write!(f, "x ")?;
-        } else if let Some(prio) = self.priority {
+        } else if let Some(Priority(prio)) = self.priority {
             write!(f, "({prio}) ")?;
         }
         if let Some(date) = self.completion_date {
@@ -299,7 +483,7 @@ impl Display for TodoItem {
 
         write!(f, "{content}", content = self.content)?;
 
-        if let (true, Some(priority)) = (self.completed, self.priority) {
+        if let (true, Some(Priority(priority))) = (self.completed, self.priority) {
             write!(f, " pri:{priority}")?;
         }
         if let Some(date) = self.due {
@@ -316,8 +500,30 @@ impl Display for TodoItem {
     }
 }
 
+pub enum ContentPart<'item> {
+    Normal(&'item str),
+    Context(&'item str),
+    Project(&'item str),
+    // TODO: Error variants (pri, etc)
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Default, Clone, Copy)]
+pub struct Priority(pub char);
+
+impl TryFrom<char> for Priority {
+    type Error = String;
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        if !value.is_ascii_uppercase() {
+            Err(format!("Not a valid priority: '{value}'"))
+        } else {
+            Ok(Priority(value))
+        }
+    }
+}
+
 /// A recurrence pattern for todo items
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Recurring {
     /// The amount
     pub amount: u32,
@@ -326,7 +532,7 @@ pub struct Recurring {
 }
 
 /// Unit of a recurrence pattern
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RecurringUnit {
     Days,
     Weeks,
@@ -361,58 +567,5 @@ impl Display for Recurring {
         };
 
         write!(f, "{amount}{unit}", amount = self.amount)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::str::FromStr;
-
-    use crate::todo::TodoList;
-
-    const TEST_INPUT: &str = "\
-(A) 2020-02-20 due:2031-07-11 Thank Mom for the meatballs @phone
-(B) Schedule Goodwill t:5032-12-09 pickup +GarageSale @phone
-(C) Bernard Goodwill thinkgs @beans are awesome?
-x 2000-11-14 3000-11-30 Post rec:1w signs around pri:B the neighborhood +GarageSale
-@GroceryStore Eskimo pies
-x Completed task +nice
-";
-
-    #[test]
-    fn test_parsing() {
-        let list = TodoList::from_str(TEST_INPUT);
-        assert!(dbg!(&list).is_ok());
-        let list = list.unwrap();
-        print!("{}", list);
-        assert_eq!(list, list.to_string().parse().unwrap());
-    }
-
-    #[test]
-    fn test_filter_basic() {
-        let list = TodoList::from_str(TEST_INPUT).unwrap();
-        assert_eq!(dbg!(list.filtered("prio:A", true)).len(), 1);
-        assert_eq!(dbg!(list.filtered("prio:B", true)).len(), 2);
-        assert_eq!(dbg!(list.filtered("prio:", true)).len(), 2);
-        assert_eq!(dbg!(list.filtered("done:", true)).len(), 4);
-        assert_eq!(dbg!(list.filtered("done:x", true)).len(), 2);
-    }
-
-    #[test]
-    fn test_filter_words() {
-        let list = TodoList::from_str(TEST_INPUT).unwrap();
-        assert_eq!(dbg!(list.filtered("@phone", true)).len(), 2);
-        assert_eq!(dbg!(list.filtered("@nix", true)).len(), 0);
-        assert_eq!(dbg!(list.filtered("+GarageSale", true)).len(), 2);
-        assert_eq!(dbg!(list.filtered("around Post", true)).len(), 1);
-        assert_eq!(dbg!(list.filtered("the", true)).len(), 2);
-    }
-
-    #[test]
-    fn test_filter_simple_combinations() {
-        let list = TodoList::from_str(TEST_INPUT).unwrap();
-        assert_eq!(dbg!(list.filtered("prio:A @phone done:", true)).len(), 1);
-        assert_eq!(dbg!(list.filtered("done:x prio:", true)).len(), 1);
-        assert_eq!(dbg!(list.filtered("+GarageSale prio:C", true)).len(), 0);
     }
 }

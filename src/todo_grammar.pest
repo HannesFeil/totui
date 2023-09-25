@@ -14,7 +14,7 @@ pri     = { "pri:" ~ ASCII_ALPHA_UPPER }
 t       = { "t:" ~ date }
 
 tag     = { (project | context | rec | pri | t | due) }
-content = { tag? ~ (space ~ tag | !new_line ~ ANY)+ }
+content = { tag? ~ (space ~ tag | !new_line ~ ANY)+ | tag }
 
 item = {
     ((priority ~ space) | (completed ~ space ~ (date ~ space)?))? ~ (date ~ space)? ~ content ~ new_line
