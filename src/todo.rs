@@ -3,11 +3,10 @@ use std::{
     collections::HashSet,
     fmt::Display,
     num::ParseIntError,
-    ops::Range,
     str::FromStr,
 };
 
-use chrono::{Local, NaiveDate};
+use chrono::{Days, Local, Months, NaiveDate};
 use pest::Parser;
 use pest_derive::Parser;
 
@@ -177,12 +176,6 @@ impl FromStr for TodoList {
                             };
 
                             match tag.as_rule() {
-                                Rule::project => {
-                                    item.projects.push(tag_start..tag_end);
-                                }
-                                Rule::context => {
-                                    item.contexts.push(tag_start..tag_end);
-                                }
                                 Rule::rec => {
                                     if item.recurring.is_some() {
                                         return Err(format!(
@@ -237,6 +230,7 @@ impl FromStr for TodoList {
                                             .unwrap(),
                                     );
                                 }
+                                Rule::context | Rule::project => {}
                                 _ => unreachable!(),
                             }
                         }
@@ -314,10 +308,6 @@ pub struct TodoItem {
     /// The content including contexts and projects but excluding
     /// `label:value` tags, `priority` and `completion`
     content: String,
-    /// Ranges of contexts in `content`
-    contexts: Vec<Range<usize>>,
-    /// Ranges of projects in `content`
-    projects: Vec<Range<usize>>,
     /// The creation date
     creation_date: Option<NaiveDate>,
     /// The completion date
@@ -339,19 +329,48 @@ impl TodoItem {
     }
 
     pub fn valid(&self) -> bool {
-        !self
-            .iter_content_parts()
-            .any(|p| matches!(p, ContentPart::Normal(_))) // TODO:
+        !self.iter_content_parts().any(|p| {
+            matches!(
+                p,
+                ContentPart::Due(_)
+                    | ContentPart::Priority(_)
+                    | ContentPart::Recurrence(_)
+                    | ContentPart::Threshhold(_)
+            )
+        })
     }
 
     pub fn completed(&self) -> bool {
         self.completed
     }
 
-    pub fn toggle_completed(&mut self) {
+    pub fn toggle_completed(&mut self) -> Option<TodoItem> {
         self.completed = !self.completed;
         self.completion_date =
             (self.completed && self.creation_date.is_some()).then_some(Local::now().date_naive());
+
+        if let (true, Some(rec)) = (self.completed, self.recurring) {
+            let mut copy = self.clone();
+            let now = Local::now().date_naive();
+            copy.completion_date = None;
+            copy.completed = false;
+
+            if self.creation_date.is_some() {
+                copy.creation_date = Some(now);
+            }
+
+            if let Some(date) = self.due {
+                copy.due = Some(rec.apply(date, now));
+            }
+
+            if let Some(date) = self.threshhold {
+                copy.threshhold = Some(rec.apply(date, now));
+            }
+
+            Some(copy)
+        } else {
+            None
+        }
     }
 
     pub fn content(&self) -> &str {
@@ -360,15 +379,31 @@ impl TodoItem {
 
     pub fn set_content(&mut self, content: String) {
         self.content = content;
+    }
 
-        self.contexts.clear();
-        self.projects.clear();
+    pub fn contexts(&self) -> impl Iterator<Item = &str> {
+        self.iter_content_parts().filter_map(|p| match p {
+            ContentPart::Context(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn projects(&self) -> impl Iterator<Item = &str> {
+        self.iter_content_parts().filter_map(|p| match p {
+            ContentPart::Project(s) => Some(s),
+            _ => None,
+        })
+    }
+
+    pub fn iter_content_parts(&self) -> impl Iterator<Item = ContentPart> {
+        let mut content = vec![];
 
         if self.content.is_empty() {
-            return;
+            return content.into_iter();
         }
 
-        // TODO: validate
+        let mut index = 0;
+
         for item in TodoListParser::parse(Rule::content, &self.content)
             .unwrap()
             .next()
@@ -376,56 +411,29 @@ impl TodoItem {
             .into_inner()
             .flat_map(|item| item.into_inner())
         {
+            if item.as_span().start() > index {
+                content.push(ContentPart::Normal(
+                    &self.content[index..item.as_span().start()],
+                ))
+            }
+            index = item.as_span().end();
+
             match item.as_rule() {
-                Rule::context => self
-                    .contexts
-                    .push(item.as_span().start()..item.as_span().end()),
-                Rule::project => self
-                    .projects
-                    .push(item.as_span().start()..item.as_span().end()),
-                _ => {}
+                Rule::context => content.push(ContentPart::Context(item.as_str())),
+                Rule::project => content.push(ContentPart::Project(item.as_str())),
+                Rule::rec => content.push(ContentPart::Recurrence(item.as_str())),
+                Rule::due => content.push(ContentPart::Due(item.as_str())),
+                Rule::pri => content.push(ContentPart::Priority(item.as_str())),
+                Rule::t => content.push(ContentPart::Threshhold(item.as_str())),
+                _ => unreachable!(),
             }
         }
-    }
 
-    pub fn contexts(&self) -> impl Iterator<Item = &str> {
-        self.contexts.iter().map(|r| &self.content[r.clone()])
-    }
-
-    pub fn projects(&self) -> impl Iterator<Item = &str> {
-        self.projects.iter().map(|r| &self.content[r.clone()])
-    }
-
-    pub fn iter_content_parts(&self) -> impl Iterator<Item = ContentPart> {
-        let mut index = 0;
-        let mut context_iter = self.contexts.iter().cloned().peekable();
-        let mut project_iter = self.projects.iter().cloned().peekable();
-        let mut result = vec![];
-        while index < self.content.len() {
-            match (context_iter.peek(), project_iter.peek()) {
-                (Some(range), _) if range.start == index => {
-                    index = range.end;
-                    result.push(ContentPart::Context(
-                        &self.content[context_iter.next().unwrap()],
-                    ));
-                }
-                (_, Some(range)) if range.start == index => {
-                    index = range.end;
-                    result.push(ContentPart::Project(
-                        &self.content[project_iter.next().unwrap()],
-                    ));
-                }
-                (next_context, next_project) => {
-                    let len = self.content.len();
-                    let end = len
-                        .min(next_context.map_or(len, |r| r.start))
-                        .min(next_project.map_or(len, |r| r.start));
-                    result.push(ContentPart::Normal(&self.content[index..end]));
-                    index = end;
-                }
-            }
+        if index < self.content.len() {
+            content.push(ContentPart::Normal(&self.content[index..]));
         }
-        result.into_iter()
+
+        content.into_iter()
     }
 }
 
@@ -504,7 +512,10 @@ pub enum ContentPart<'item> {
     Normal(&'item str),
     Context(&'item str),
     Project(&'item str),
-    // TODO: Error variants (pri, etc)
+    Recurrence(&'item str),
+    Due(&'item str),
+    Priority(&'item str),
+    Threshhold(&'item str),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Default, Clone, Copy)]
@@ -525,10 +536,30 @@ impl TryFrom<char> for Priority {
 /// A recurrence pattern for todo items
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Recurring {
+    /// Whether its relative to completion
+    pub relative: bool,
     /// The amount
     pub amount: u32,
     /// The unit of recurrence
     pub unit: RecurringUnit,
+}
+
+impl Recurring {
+    pub fn apply(&self, date: NaiveDate, now: NaiveDate) -> NaiveDate {
+        let date = if self.relative { now } else { date };
+        match self.unit {
+            RecurringUnit::Days => date
+                .checked_add_days(Days::new(self.amount as u64))
+                .unwrap(),
+            RecurringUnit::Weeks => date
+                .checked_add_days(Days::new(self.amount as u64 * 7))
+                .unwrap(),
+            RecurringUnit::Months => date.checked_add_months(Months::new(self.amount)).unwrap(),
+            RecurringUnit::Years => date
+                .checked_add_months(Months::new(self.amount * 12))
+                .unwrap(),
+        }
+    }
 }
 
 /// Unit of a recurrence pattern
@@ -544,7 +575,8 @@ impl FromStr for Recurring {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let amount = s[..s.len() - 1].parse()?;
+        let relative = s.starts_with('+');
+        let amount = s[if relative { 1 } else { 0 }..s.len() - 1].parse()?;
         let unit = match s.chars().last().unwrap() {
             'd' => RecurringUnit::Days,
             'w' => RecurringUnit::Weeks,
@@ -553,7 +585,11 @@ impl FromStr for Recurring {
             _ => unreachable!(),
         };
 
-        Ok(Self { amount, unit })
+        Ok(Self {
+            relative,
+            amount,
+            unit,
+        })
     }
 }
 
@@ -566,6 +602,11 @@ impl Display for Recurring {
             RecurringUnit::Years => "y",
         };
 
-        write!(f, "{amount}{unit}", amount = self.amount)
+        write!(
+            f,
+            "{relative}{amount}{unit}",
+            amount = self.amount,
+            relative = if self.relative { "+" } else { "" }
+        )
     }
 }

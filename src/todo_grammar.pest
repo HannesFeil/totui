@@ -8,7 +8,7 @@ date      = { ASCII_DIGIT{4} ~ "-" ~ ASCII_DIGIT{2} ~ "-" ~ ASCII_DIGIT{2} }
 
 context = { "@" ~ word_char+ }
 project = { "+" ~ word_char+ }
-rec     = { "rec:" ~ ASCII_DIGIT+ ~ ("d" | "w" | "m" | "y") }
+rec     = { "rec:" ~ "+"? ~ ASCII_DIGIT+ ~ ("d" | "w" | "m" | "y") }
 due     = { "due:" ~ date }
 pri     = { "pri:" ~ ASCII_ALPHA_UPPER }
 t       = { "t:" ~ date }
