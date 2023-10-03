@@ -1,7 +1,12 @@
 [package]
 name = "totui"
+description = "A simple todo.txt TUI"
+repository = "https://github.com/HannesFeil/totui"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+keywords = ["todo", "tui"]
+categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
