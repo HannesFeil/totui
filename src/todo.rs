@@ -31,10 +31,12 @@ pub struct TodoList {
 }
 
 impl TodoList {
+    /// The currently applied filter
     pub fn filter(&self) -> &Filter {
         &self.filter
     }
 
+    /// Mutate the filter and reapply it
     pub fn mutate_filter(&mut self, f: impl FnOnce(&mut Filter)) {
         f(&mut self.filter);
         self.apply_filter();
@@ -105,7 +107,6 @@ impl TodoList {
         self.projects.iter().map(String::as_str)
     }
 
-    // TODO: make better
     /// Mutate the list. Afterwards sorts the list and updates contexts and projects
     pub fn mutate_then_update(&mut self, f: impl FnOnce(&mut Vec<TodoItem>)) {
         f(&mut self.items);
@@ -321,6 +322,7 @@ pub struct TodoItem {
 }
 
 impl TodoItem {
+    /// Create a new item and applies today as creation date if `creation_date` is `true`
     pub fn new(creation_date: bool) -> TodoItem {
         Self {
             creation_date: creation_date.then_some(Local::now().date_naive()),
@@ -328,6 +330,7 @@ impl TodoItem {
         }
     }
 
+    /// Return if this item is valid e.g. the content does not contain tags like 'due:...'
     pub fn valid(&self) -> bool {
         !self.iter_content_parts().any(|p| {
             matches!(
@@ -340,10 +343,13 @@ impl TodoItem {
         })
     }
 
+    /// Return if this item has been completed
     pub fn completed(&self) -> bool {
         self.completed
     }
 
+    /// Toggle item completion, updating completion date if creation date was set
+    /// Optionally returns a new item if recurrence was set
     pub fn toggle_completed(&mut self) -> Option<TodoItem> {
         self.completed = !self.completed;
         self.completion_date =
@@ -373,14 +379,17 @@ impl TodoItem {
         }
     }
 
+    /// Return the item content
     pub fn content(&self) -> &str {
         &self.content
     }
 
+    /// Set the item content
     pub fn set_content(&mut self, content: String) {
         self.content = content;
     }
 
+    /// Iter through the contexts present in the item content
     pub fn contexts(&self) -> impl Iterator<Item = &str> {
         self.iter_content_parts().filter_map(|p| match p {
             ContentPart::Context(s) => Some(s),
@@ -388,6 +397,7 @@ impl TodoItem {
         })
     }
 
+    /// Iter through the projects present in the item content
     pub fn projects(&self) -> impl Iterator<Item = &str> {
         self.iter_content_parts().filter_map(|p| match p {
             ContentPart::Project(s) => Some(s),
@@ -395,6 +405,7 @@ impl TodoItem {
         })
     }
 
+    /// Iter through all parts of the item content
     pub fn iter_content_parts(&self) -> impl Iterator<Item = ContentPart> {
         let mut content = vec![];
 
@@ -508,6 +519,7 @@ impl Display for TodoItem {
     }
 }
 
+/// A part of an item content
 pub enum ContentPart<'item> {
     Normal(&'item str),
     Context(&'item str),

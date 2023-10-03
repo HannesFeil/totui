@@ -27,7 +27,9 @@ mod todo;
 mod ui;
 mod widgets;
 
+/// Max millis per redraw
 const MILLIS_PER_TICK: u64 = 100;
+/// Max redraws per save
 const TICKS_PER_SAVE: u32 = 1000;
 
 /// Arguments to the program
@@ -128,6 +130,7 @@ pub enum EditDate {
 }
 
 impl FocusState {
+    /// Handle an incoming event
     pub fn handle_event(
         &mut self,
         event: &event::Event,
@@ -158,6 +161,7 @@ impl FocusState {
         }
     }
 
+    /// Handle `KeyEvent` while browsing
     fn handle_browsing_event(
         &mut self,
         event: &event::KeyEvent,
@@ -347,6 +351,7 @@ impl FocusState {
         None
     }
 
+    /// Handle `KeyEvent` while editing the filter
     fn handle_filter_typing_event(
         &mut self,
         e: &event::Event,
@@ -440,6 +445,7 @@ impl FocusState {
         None
     }
 
+    /// Handle `KeyEvent` while editing an item
     fn handle_item_typing_event(
         &mut self,
         e: &event::Event,
@@ -521,6 +527,7 @@ impl FocusState {
         None
     }
 
+    /// Handle `KeyEvent` while picking a priority
     fn handle_priority_picking_event(
         &mut self,
         event: &event::KeyEvent,
@@ -604,6 +611,7 @@ impl FocusState {
         None
     }
 
+    /// Handle `KeyEvent` while picking a date
     fn handle_date_picking_event(
         &mut self,
         event: &event::KeyEvent,
@@ -689,6 +697,7 @@ impl FocusState {
         None
     }
 
+    /// Handle `KeyEvent` while picking recurrence
     fn handle_recurrence_picking_event(
         &mut self,
         event: &event::KeyEvent,
@@ -764,10 +773,12 @@ pub struct CompletionPopup {
 }
 
 impl CompletionPopup {
+    /// If this popup should be shown
     pub fn visible(&self) -> bool {
         !self.options.is_empty()
     }
 
+    /// Update the completion suggestions
     pub fn update_options<'a>(
         &mut self,
         input: &Input,
@@ -791,6 +802,7 @@ impl CompletionPopup {
         }
     }
 
+    /// Apply the selected suggestion
     pub fn apply(&mut self, input: &mut Input) {
         if let Some(index) = self.state.selected() {
             let range = CompletionPopup::text_range(input);
@@ -811,6 +823,7 @@ impl CompletionPopup {
         self.state.select(None);
     }
 
+    /// Get the range from the current word until cursor
     fn text_range(input: &Input) -> Range<usize> {
         let start = input.value()[..input.cursor()]
             .rfind(char::is_whitespace)
@@ -818,6 +831,7 @@ impl CompletionPopup {
         start..input.cursor()
     }
 
+    /// Select the next entry, wrapping around to no selection
     pub fn next(&mut self) {
         self.state
             .select(self.state.selected().map_or(Some(0), |i| {

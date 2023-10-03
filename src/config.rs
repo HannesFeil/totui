@@ -242,6 +242,7 @@ pub struct Config {
 }
 
 impl Config {
+    /// Return the default config path including file name and extension
     pub fn default_path() -> PathBuf {
         let sp = standard_paths::default_paths!();
         let mut path = sp
@@ -252,6 +253,8 @@ impl Config {
         path
     }
 
+    /// Read a config file or return a default config
+    /// If `path` is `None`, tries to read from the [Self::default_path()]
     pub fn read(path: Option<PathBuf>) -> Config {
         let path = path.unwrap_or_else(Self::default_path);
 
@@ -280,6 +283,8 @@ impl Config {
         config
     }
 
+    /// Writes the default config to the given `path`
+    /// If `path` is `None`, writes to the [Self::default_path()]
     pub fn write_default(&self, path: Option<PathBuf>) -> PathBuf {
         let path = path.unwrap_or_else(Self::default_path);
 
