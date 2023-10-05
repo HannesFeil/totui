@@ -569,6 +569,8 @@ config_struct! {
         pub completion_window_height: u16 = 10,
         /// Adds removed items to an archive
         pub archive_removed: bool = true,
+        /// Hide threshhold tasks above this many days in the future
+        pub threshhold_days: u16 = 6,
     }
 }
 
@@ -694,8 +696,14 @@ config_struct! {
 
         /// The text for the threshhold date (%d will be replaced with the date)
         pub threshhold_text: String = "start: %d".to_owned(),
+        /// The text used to indicate filtering out threshhold items
+        pub filter_threshhold_text: String = "󱑎 ".to_owned(),
         /// The style for the threshhold date
         pub threshhold_style: Style = Style::new().fg(Color::Blue),
+        /// The text used to indicate not filtering out threshhold items
+        pub no_filter_threshhold_text: String = "󱑎 ".to_owned(),
+        /// The style for the threshhold date
+        pub no_threshhold_style: Style = Style::new().fg(Color::DarkGray),
 
         /// The text for the due date (%d will be replaced with the date)
         pub due_text: String = "due: %d".to_owned(),

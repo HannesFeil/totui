@@ -51,6 +51,7 @@ impl TodoList {
             self.filter.words.iter().cloned().collect()
         };
 
+        let now = Local::now().date_naive();
         self.items
             .iter()
             .enumerate()
@@ -65,6 +66,15 @@ impl TodoList {
                 // Filter out completed
                 if let Some(completed) = self.filter.completed {
                     if item.completed != completed {
+                        return false;
+                    }
+                }
+
+                // Filter out threshholds in the future
+                if let (Some(days), Some(threshhold)) =
+                    (self.filter.hide_threshhold_days, item.threshhold)
+                {
+                    if threshhold.signed_duration_since(now).num_days() > days as i64 {
                         return false;
                     }
                 }
@@ -288,12 +298,15 @@ pub struct Filter {
     pub words: Vec<String>,
     /// Ignore case while searching words
     pub ignore_case: bool,
+    /// Hide tasks with threshhold more than this amount of days in the future
+    pub hide_threshhold_days: Option<u32>,
 }
 
 impl Filter {
-    pub fn new(ignore_case: bool) -> Filter {
+    pub fn new(ignore_case: bool, hide_threshhold_days: u32) -> Filter {
         Self {
             ignore_case,
+            hide_threshhold_days: Some(hide_threshhold_days),
             ..Default::default()
         }
     }

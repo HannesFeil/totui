@@ -138,6 +138,11 @@ impl FocusState {
         config: &Config,
     ) -> Option<FocusState> {
         match event {
+            event::Event::FocusLost => {
+                std::fs::write(&state.file_path, state.todo_list.to_string())
+                    .expect("Expect write to succeed");
+                None
+            }
             e @ event::Event::Key(event) => match self {
                 FocusState::FilterTyping { .. } => {
                     self.handle_filter_typing_event(e, event, state, config)
@@ -195,7 +200,9 @@ impl FocusState {
                 }));
         } else if config.keys.clear_filter.applies(event) {
             state.filter.reset();
-            state.todo_list.mutate_filter(|f| *f = Filter::new(true));
+            state
+                .todo_list
+                .mutate_filter(|f| *f = Filter::new(true, config.general.threshhold_days.into()));
         } else if config.keys.filter.applies(event) {
             return Some(FocusState::FilterTyping {
                 previous_filter: state.todo_list.filter().clone(),
@@ -324,14 +331,16 @@ impl FocusState {
             }
         } else if config.keys.remove_completed.applies(event) {
             let mut items = vec![];
-            state
-                .todo_list
-                .mutate_then_update(|l| l.retain(|item| if !item.completed() {
-                    true
-                } else {
-                    items.push(item.to_string());
-                    false
-                }));
+            state.todo_list.mutate_then_update(|l| {
+                l.retain(|item| {
+                    if !item.completed() {
+                        true
+                    } else {
+                        items.push(item.to_string());
+                        false
+                    }
+                })
+            });
             let mut item_string = items.join("\n");
             item_string.push('\n');
 
@@ -426,6 +435,14 @@ impl FocusState {
                     })
                 }
             }
+        } else if config.keys.typing_edit_threshhold.applies(event) {
+            state.todo_list.mutate_filter(|f| {
+                if f.hide_threshhold_days.is_some() {
+                    f.hide_threshhold_days = None;
+                } else {
+                    f.hide_threshhold_days = Some(config.general.threshhold_days.into());
+                }
+            })
         } else if let Some(StateChanged { value: true, .. }) = state.filter.handle_event(e) {
             state.todo_list.mutate_filter(|f| {
                 f.words = state
@@ -784,6 +801,10 @@ impl CompletionPopup {
         input: &Input,
         total_options: impl Iterator<Item = &'a str>,
     ) {
+        if input.value().is_empty() {
+            return;
+        }
+
         let text = &input.value()[CompletionPopup::text_range(input)];
         let selected = self.state.selected().map(|i| self.options[i].clone());
         self.options = total_options
@@ -825,10 +846,16 @@ impl CompletionPopup {
 
     /// Get the range from the current word until cursor
     fn text_range(input: &Input) -> Range<usize> {
-        let start = input.value()[..input.cursor()]
+        let index = input
+            .value()
+            .char_indices()
+            .nth(input.visual_cursor() - 1)
+            .unwrap()
+            .0;
+        let start = input.value()[..index]
             .rfind(char::is_whitespace)
             .map_or(0, |i| i + 1);
-        start..input.cursor()
+        start..index
     }
 
     /// Select the next entry, wrapping around to no selection
@@ -894,7 +921,8 @@ fn main() {
                 default_hook(panic_info)
             }));
 
-            todo_list.mutate_filter(|f| *f = Filter::new(true));
+            todo_list
+                .mutate_filter(|f| *f = Filter::new(true, config.general.threshhold_days.into()));
 
             let state = State {
                 file_path: file.clone(),

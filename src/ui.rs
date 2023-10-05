@@ -147,7 +147,8 @@ pub fn draw(
                     cancel,
                     typing_toggle_ignore_case: "toggle ignore case",
                     typing_toggle_done: "completion",
-                    typing_edit_priority: "priority"
+                    typing_edit_priority: "priority",
+                    typing_edit_threshhold: "threshhold"
                 ),
                 FocusState::ItemTyping { .. } => {
                     keys_help!(
@@ -567,6 +568,17 @@ fn display_filter<'filter>(
 
     if ignore_case.width() != 0 {
         spans.push(ignore_case);
+        spans.push(sep.clone());
+    }
+
+    let threshhold = if filter.hide_threshhold_days.is_some() {
+        Span::styled(&config.display.filter_threshhold_text, config.display.threshhold_style)
+    } else {
+        Span::styled(&config.display.no_filter_threshhold_text, config.display.no_threshhold_style)
+    };
+
+    if threshhold.width() != 0 {
+        spans.push(threshhold);
         spans.push(sep.clone());
     }
 
