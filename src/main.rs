@@ -849,9 +849,9 @@ impl CompletionPopup {
         let index = input
             .value()
             .char_indices()
-            .nth(input.visual_cursor() - 1)
-            .unwrap()
-            .0;
+            .nth(input.visual_cursor().saturating_sub(1))
+            .map(|v| v.0)
+            .unwrap_or_default();
         let start = input.value()[..index]
             .rfind(char::is_whitespace)
             .map_or(0, |i| i + 1);
