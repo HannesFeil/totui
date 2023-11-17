@@ -802,6 +802,7 @@ impl CompletionPopup {
         total_options: impl Iterator<Item = &'a str>,
     ) {
         if input.value().is_empty() {
+            self.options.clear();
             return;
         }
 
@@ -846,16 +847,20 @@ impl CompletionPopup {
 
     /// Get the range from the current word until cursor
     fn text_range(input: &Input) -> Range<usize> {
-        let index = input
+        let end_char = input.visual_cursor();
+        let end_byte = input
             .value()
             .char_indices()
-            .nth(input.visual_cursor().saturating_sub(1))
-            .map(|v| v.0)
-            .unwrap_or_default();
-        let start = input.value()[..index]
-            .rfind(char::is_whitespace)
-            .map_or(0, |i| i + 1);
-        start..index
+            .nth(end_char)
+            .map(|(i, _)| i)
+            .unwrap_or(input.value().len());
+        let start_byte = input.value()[..end_byte]
+            .char_indices()
+            .rfind(|(_, c)| c.is_whitespace())
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        start_byte..end_byte
     }
 
     /// Select the next entry, wrapping around to no selection
