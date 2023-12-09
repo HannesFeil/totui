@@ -248,8 +248,7 @@ impl Config {
         let mut path = sp
             .writable_location(standard_paths::LocationType::AppConfigLocation)
             .expect("Expect available config directory");
-        path.set_file_name("totui");
-        path.set_extension("toml");
+        path.push("config.toml");
         path
     }
 
@@ -275,6 +274,7 @@ impl Config {
                 }
             }
         } else {
+            eprintln!("No config found at '{path:?}', continuing with default config. Consider writing the default config see totui --help");
             Config::default()
         };
 
