@@ -1,0 +1,13 @@
+[package]
+name = "totui"
+description = "A TUI for TODO.txt files"
+version = "0.1.0"
+authors = ["HannesFeil <hannesfeil@gmx.de>"]
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.11", features = ["derive"] }
+ratatui = "0.27.0"
+confy = { version = "0.6.1", features = ["toml_conf"] }
+serde = { version = "1.0.204", features = ["derive"] }
