@@ -21,9 +21,9 @@ impl TodoList {
 
 #[derive(Debug)]
 pub struct TodoItem {
-    completion_date: Option<NaiveDate>,
+    pub completion_date: Option<NaiveDate>,
     priority: Option<char>,
-    creation_date: NaiveDate,
+    pub creation_date: NaiveDate,
     content: Vec<ContentPart>,
     context_indices: Vec<usize>,
     project_indices: Vec<usize>,
@@ -48,6 +48,133 @@ impl Display for TodoItem {
         }
 
         Ok(())
+    }
+}
+
+impl TodoItem {
+    pub fn new(creation_date: NaiveDate) -> Self {
+        Self {
+            completion_date: None,
+            priority: None,
+            creation_date,
+            content: vec![],
+            context_indices: vec![],
+            project_indices: vec![],
+            rec_index: None,
+            due_index: None,
+            t_index: None,
+            pri_index: None,
+        }
+    }
+
+    pub fn priority(&self) -> Option<char> {
+        self.priority.or(self.pri_index.map(|i| {
+            let ContentPart::Pri(priority) = self.content[i] else {
+                unreachable!();
+            };
+
+            priority
+        }))
+    }
+
+    pub fn priority_mut(&mut self) -> Option<&mut char> {
+        self.priority.as_mut().or(self.pri_index.map(|i| {
+            let ContentPart::Pri(priority) = &mut self.content[i] else {
+                unreachable!();
+            };
+
+            priority
+        }))
+    }
+
+    pub fn contexts(&self) -> impl Iterator<Item = &str> {
+        self.context_indices.iter().map(|i| {
+            let ContentPart::Context(s) = &self.content[*i] else {
+                unreachable!();
+            };
+
+            s.as_str()
+        })
+    }
+
+    pub fn projects(&self) -> impl Iterator<Item = &str> {
+        self.project_indices.iter().map(|i| {
+            let ContentPart::Project(s) = &self.content[*i] else {
+                unreachable!();
+            };
+
+            s.as_str()
+        })
+    }
+
+    pub fn recurring(&self) -> Option<(bool, u32, RecurringUnit)> {
+        self.rec_index.map(|i| {
+            let ContentPart::Rec {
+                relative,
+                amount,
+                unit,
+            } = self.content[i]
+            else {
+                unreachable!()
+            };
+
+            (relative, amount, unit)
+        })
+    }
+
+    pub fn recurring_mut(&mut self) -> Option<(&mut bool, &mut u32, &mut RecurringUnit)> {
+        self.rec_index.map(|i| {
+            let ContentPart::Rec {
+                relative,
+                amount,
+                unit,
+            } = &mut self.content[i]
+            else {
+                unreachable!()
+            };
+
+            (relative, amount, unit)
+        })
+    }
+
+    pub fn due_date(&self) -> Option<&NaiveDate> {
+        self.due_index.map(|i| {
+            let ContentPart::Due(date) = &self.content[i] else {
+                unreachable!()
+            };
+
+            date
+        })
+    }
+
+    pub fn due_date_mut(&mut self) -> Option<&mut NaiveDate> {
+        self.due_index.map(|i| {
+            let ContentPart::Due(date) = &mut self.content[i] else {
+                unreachable!()
+            };
+
+            date
+        })
+    }
+
+    pub fn t_date(&self) -> Option<&NaiveDate> {
+        self.t_index.map(|i| {
+            let ContentPart::T(date) = &self.content[i] else {
+                unreachable!()
+            };
+
+            date
+        })
+    }
+
+    pub fn t_date_mut(&mut self) -> Option<&mut NaiveDate> {
+        self.t_index.map(|i| {
+            let ContentPart::T(date) = &mut self.content[i] else {
+                unreachable!()
+            };
+
+            date
+        })
     }
 }
 
@@ -90,7 +217,7 @@ impl Display for ContentPart {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum RecurringUnit {
     Days,
     Weeks,
