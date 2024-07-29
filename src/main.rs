@@ -1,9 +1,10 @@
 use clap::Parser;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
+use totui::todo::TodoList;
 use std::io;
 use std::path::PathBuf;
-use totui::app::{App, AppResult};
+use totui::app::App;
 use totui::config::Config;
 use totui::event::{Event, EventHandler};
 use totui::handler::handle_key_events;
@@ -20,12 +21,14 @@ struct Args {
     config_file: Option<PathBuf>,
 }
 
-fn main() -> AppResult<()> {
+fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let config: Config = match &args.config_file {
         Some(file) => confy::load_path(file)?,
         None => confy::load(env!("CARGO_PKG_NAME"), "config")?,
     };
+    let todo_file_content = std::fs::read_to_string(&args.todo_file)?;
+    let todo_list = TodoList::parse(&todo_file_content)?;
 
     // Create an application.
     let mut app = App::new();

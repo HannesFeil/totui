@@ -1,0 +1,24 @@
+space         = _{ SPACE_SEPARATOR+ }
+number        =  { ASCII_DIGIT+ }
+
+date          = { ASCII_DIGIT{4} ~ "-" ~ ASCII_DIGIT{2} ~ "-" ~ ASCII_DIGIT{2} }
+completed     = { "x" ~ space ~ date }
+priority_char = { ASCII_ALPHA_UPPER }
+priority      = _{ "(" ~ priority_char ~ ")" }
+
+word          = { (!space ~ !NEWLINE ~ ANY)+ }
+context       = { "@" ~ word }
+project       = { "+" ~ word }
+rec_unit      = { "d" | "w" | "m" | "y" }
+rec_time      = { number ~ rec_unit }
+rec_time_rel  = { "+" ~ rec_time }
+rec           = { "rec:" ~ (rec_time_rel | rec_time) }
+due           = { "due:" ~ date }
+pri           = { "pri:" ~ priority_char }
+t             = { "t:" ~ date }
+
+meta          = _{ context | project | rec | due | pri | t }
+content_space = { space }
+content       = { (meta | word) ~ (content_space ~ (meta | word))* }
+
+item          = { ((completed | priority) ~ space)? ~ date ~ space ~ content }

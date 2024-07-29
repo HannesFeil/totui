@@ -1,0 +1,25 @@
+(B) 2024-07-26 Spiel Essen mit Aaron planen
+(A) 2024-07-26 @nixos Change PW
+(A) 2024-07-26 @uni Semesterplanung: Fortgeschrittene Konzepte der Programmierung
+(A) 2024-07-26 @uni +AUD Stundenzettel
+(B) 2024-07-26 @org TODO.txt
+2024-07-26 @nixos Sioyek Welcome
+2024-07-26 @nixos alot binds
+2024-07-26 @nixos discord alternative
+2024-07-26 @nixos replace vimiv
+(A) 2024-07-26 Immatr an BI schicken t:2024-09-01 due:2024-10-01 rec:+6m
+(C) 2024-07-26 Keramik bemalen mit Mama
+(B) 2024-07-26 Therapie für Alena?
+(B) 2024-07-26 +fopra File view
+(B) 2024-07-26 +fopra update class diagramm
+(B) 2024-07-26 +fopra check accessability
+2024-07-26 @programming Wizard roguelike
+2024-07-26 @programming calendar app?
+2024-07-26 @programming big tic tac toe
+2024-07-26 @programming coding game
+2024-07-26 @idea Brombeeren sammeln
+2024-07-26 @idea Origami Popup book
+2024-07-26 @idea Posterwand
+2024-07-26 @idea cent sculptures
+2024-07-26 @idea @food Foccacia zubereiten
+x 2024-07-26 2024-07-26 Test Nice pri:D
