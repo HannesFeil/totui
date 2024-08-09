@@ -1,13 +1,13 @@
 (B) 2024-07-26 Spiel Essen mit Aaron planen
 (A) 2024-07-26 @nixos Change PW
-(A) 2024-07-26 @uni Semesterplanung: Fortgeschrittene Konzepte der Programmierung
+(A) 2024-07-26 @uni Semesterplanung: Fortgeschrittene Konzepte der Programmierung this is a very long item spanning multiple lines hopefully ;)
 (A) 2024-07-26 @uni +AUD Stundenzettel
 (B) 2024-07-26 @org TODO.txt
 2024-07-26 @nixos Sioyek Welcome
 2024-07-26 @nixos alot binds
 2024-07-26 @nixos discord alternative
 2024-07-26 @nixos replace vimiv
-(A) 2024-07-26 Immatr an BI schicken t:2024-09-01 due:2024-10-01 rec:+6m
+(A) 2024-07-26 Immatr an t:2024-09-01 due:2024-10-01 BI schicken rec:+6m
 (C) 2024-07-26 Keramik bemalen mit Mama
 (B) 2024-07-26 Therapie für Alena?
 (B) 2024-07-26 +fopra File view

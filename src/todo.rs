@@ -1,21 +1,26 @@
 use chrono::NaiveDate;
-use std::{fmt::Display, str::FromStr};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
+#[derive(Debug)]
 pub struct TodoList {
     items: Vec<TodoItem>,
 }
 
-impl TodoList {
-    pub fn parse(input: &str) -> anyhow::Result<Self> {
-        let mut items = vec![];
+impl Deref for TodoList {
+    type Target = Vec<TodoItem>;
 
-        for line in input.lines() {
-            let item = line.parse()?;
-            println!("{item}");
-            items.push(item);
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
 
-        Ok(Self { items })
+impl DerefMut for TodoList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.items
     }
 }
 
@@ -31,6 +36,30 @@ pub struct TodoItem {
     due_index: Option<usize>,
     t_index: Option<usize>,
     pri_index: Option<usize>,
+}
+
+#[derive(Debug)]
+pub enum ContentPart {
+    Space(String),
+    Word(String),
+    Context(String),
+    Project(String),
+    Rec {
+        relative: bool,
+        amount: u32,
+        unit: RecurringUnit,
+    },
+    Due(NaiveDate),
+    T(NaiveDate),
+    Pri(char),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum RecurringUnit {
+    Days,
+    Weeks,
+    Months,
+    Years,
 }
 
 impl Display for TodoItem {
@@ -176,22 +205,10 @@ impl TodoItem {
             date
         })
     }
-}
 
-#[derive(Debug)]
-pub enum ContentPart {
-    Space(String),
-    Word(String),
-    Context(String),
-    Project(String),
-    Rec {
-        relative: bool,
-        amount: u32,
-        unit: RecurringUnit,
-    },
-    Due(NaiveDate),
-    T(NaiveDate),
-    Pri(char),
+    pub fn content_parts(&self) -> impl Iterator<Item = &ContentPart> {
+        self.content.iter()
+    }
 }
 
 impl Display for ContentPart {
@@ -215,14 +232,6 @@ impl Display for ContentPart {
             ContentPart::Pri(prio) => write!(f, "pri:{prio}"),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum RecurringUnit {
-    Days,
-    Weeks,
-    Months,
-    Years,
 }
 
 impl FromStr for RecurringUnit {
@@ -258,7 +267,7 @@ pub mod parsing {
 
     use crate::todo::ContentPart;
 
-    use super::TodoItem;
+    use super::{TodoItem, TodoList};
 
     #[derive(Parser)]
     #[grammar = "./todo_grammar.pest"]
@@ -266,8 +275,8 @@ pub mod parsing {
 
     #[derive(Debug)]
     pub struct ItemParseError {
-        error_message: String,
-        error_span: Range<usize>,
+        pub error_message: String,
+        pub error_span: Range<usize>,
     }
 
     impl Display for ItemParseError {
@@ -282,6 +291,26 @@ pub mod parsing {
     }
 
     impl std::error::Error for ItemParseError {}
+
+    impl TodoList {
+        pub fn parse(input: &str) -> Result<TodoList, String> {
+            let mut items = vec![];
+
+            for (i, line) in input.lines().enumerate() {
+                let item = line.parse().map_err(|e: ItemParseError| {
+                    let mut markers = String::new();
+                    markers.extend((0..e.error_span.start - 1).map(|_| ' '));
+                    markers.extend(e.error_span.map(|_| '^'));
+                    format!(
+                        "Failed to parse item in line {i}:\n{line}\n{markers}\n{message}",
+                        message = e.error_message
+                    )
+                })?;
+                items.push(item);
+            }
+            Ok(Self { items })
+        }
+    }
 
     impl FromStr for TodoItem {
         type Err = ItemParseError;

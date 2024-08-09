@@ -27,11 +27,14 @@ fn main() -> anyhow::Result<()> {
         Some(file) => confy::load_path(file)?,
         None => confy::load(env!("CARGO_PKG_NAME"), "config")?,
     };
+
     let todo_file_content = std::fs::read_to_string(&args.todo_file)?;
-    let todo_list = TodoList::parse(&todo_file_content)?;
+    let todo_list = TodoList::parse(&todo_file_content).or_else(|e| {
+        anyhow::bail!("Failed to parse TODO file!\n{e}")
+    })?;
 
     // Create an application.
-    let mut app = App::new();
+    let mut app = App::new(todo_list, args.archive_file, config);
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stderr());
