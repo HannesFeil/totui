@@ -1,13 +1,14 @@
 use clap::Parser;
+use directories::ProjectDirs;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
-use totui::todo::TodoList;
 use std::io;
 use std::path::PathBuf;
 use totui::app::App;
 use totui::config::Config;
 use totui::event::{Event, EventHandler};
 use totui::handler::handle_key_events;
+use totui::todo::TodoList;
 use totui::tui::Tui;
 
 #[derive(clap::Parser, Debug)]
@@ -24,14 +25,25 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let config: Config = match &args.config_file {
-        Some(file) => confy::load_path(file)?,
-        None => confy::load(env!("CARGO_PKG_NAME"), "config")?,
+        Some(file) => toml::from_str(&std::fs::read_to_string(file)?)?,
+        None => {
+            if let Some(dirs) = ProjectDirs::from("", "", env!("CARGO_PKG_NAME")) {
+                let mut config_file = dirs.config_dir().to_path_buf();
+                config_file.push("/config.toml");
+                if config_file.try_exists()? {
+                    toml::from_str(&std::fs::read_to_string(config_file)?)?
+                } else {
+                    Config::default()
+                }
+            } else {
+                Config::default()
+            }
+        }
     };
 
     let todo_file_content = std::fs::read_to_string(&args.todo_file)?;
-    let todo_list = TodoList::parse(&todo_file_content).or_else(|e| {
-        anyhow::bail!("Failed to parse TODO file!\n{e}")
-    })?;
+    let todo_list = TodoList::parse(&todo_file_content)
+        .or_else(|e| anyhow::bail!("Failed to parse TODO file!\n{e}"))?;
 
     // Create an application.
     let mut app = App::new(todo_list, args.archive_file, config);

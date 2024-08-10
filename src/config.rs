@@ -8,16 +8,57 @@ use ratatui::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub item_complete_mark: String,
-    pub item_incomplete_mark: String,
-    pub item_priority_mark_format: String,
-    pub item_no_priority_mark: String,
-    pub item_context_style: Style,
-    pub item_project_style: Style,
-    pub item_due_style: Style,
-    pub item_t_style: Style,
+macro_rules! config_struct {
+    (
+        $name:ident:
+        $(
+            $(
+                #[$( $attr:tt )*]
+            )*
+            $vi:vis $item_name:ident: $item_type:ty $( = $item_default:expr )?
+        ),+
+        $( , )?
+    ) => {
+        #[derive(Debug, Deserialize, Serialize)]
+        pub struct $name {
+            $(
+                $(
+                    #[$( $attr )*]
+                )*
+                $vi $item_name: $item_type
+            ),+
+        }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self {
+                    $(
+                        $item_name: config_struct!(@item_init $item_type $( = $item_default)?)
+                    ),+
+                }
+            }
+        }
+    };
+    (@item_init $item_type:ty) => {
+        <$item_type>::default()
+    };
+    (@item_init $item_type:ty = $item_default:expr) => {
+        $item_default
+    };
+}
+
+config_struct! {
+    Config:
+    item_complete_mark: String = "[x]".to_owned(),
+    item_incomplete_mark: String = "[ ]".to_owned(),
+    item_priority_mark_format: String = "({p})".to_owned(),
+    item_no_priority_mark: String = "".to_owned(),
+    item_word_style: Style = Style::new(),
+    item_space_style: Style = Style::new(),
+    item_context_style: Style = Style::new().fg(Color::Green),
+    item_project_style: Style = Style::new().fg(Color::Cyan),
+    item_due_style: Style = Style::new().fg(Color::Red),
+    item_t_style: Style = Style::new().fg(Color::Blue),
 }
 
 impl Config {
@@ -45,6 +86,14 @@ impl Config {
         Span::from(&self.item_no_priority_mark).into()
     }
 
+    pub fn item_word<'a>(&'a self, word: &'a str) -> Span<'a> {
+        Span::styled(word, self.item_word_style)
+    }
+
+    pub fn item_space<'a>(&'a self, space: &'a str) -> Span<'a> {
+        Span::styled(space, self.item_space_style)
+    }
+
     pub fn item_context<'a>(&'a self, context: &'a str) -> Span<'a> {
         Span::styled(context, self.item_context_style)
     }
@@ -59,20 +108,5 @@ impl Config {
 
     pub fn item_t_date(&self, date: NaiveDate) -> Span {
         Span::styled(date.format("%d.%m.%Y").to_string(), self.item_t_style)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            item_complete_mark: "[x]".to_owned(),
-            item_incomplete_mark: "[ ]".to_owned(),
-            item_priority_mark_format: "({p})".to_owned(),
-            item_no_priority_mark: "".to_owned(),
-            item_context_style: Style::new().fg(Color::Green),
-            item_project_style: Style::new().fg(Color::Cyan),
-            item_due_style: Style::new().fg(Color::Red),
-            item_t_style: Style::new().fg(Color::Blue),
-        }
     }
 }

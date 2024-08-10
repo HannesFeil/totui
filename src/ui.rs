@@ -1,6 +1,6 @@
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Margin},
-    style::{Color, Style, Styled},
+    style::{Color, Style, Styled, Stylize},
     text::{Line, Span, Text, ToLine},
     widgets::{Block, BorderType, List, Paragraph, Row, Table},
     Frame,
@@ -67,62 +67,43 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
         let prev = prev_part;
         prev_part = Some(part);
         let span = match part {
-            ContentPart::Space(space) => match prev {
-                None
-                | Some(
-                    ContentPart::Rec { .. }
-                    | ContentPart::Due(_)
-                    | ContentPart::T(_)
-                    | ContentPart::Pri(_),
-                ) => continue,
-                _ => space.into(),
-            },
-            ContentPart::Word(word) => word.into(),
+            ContentPart::Word(word) => config.item_word(word),
             ContentPart::Context(context) => config.item_context(context),
             ContentPart::Project(project) => config.item_project(project),
-            ContentPart::Rec { .. }
+            ContentPart::Space(_)
+            | ContentPart::Rec { .. }
             | ContentPart::Due(_)
             | ContentPart::T(_)
             | ContentPart::Pri(_) => continue,
         };
+        let space = match prev {
+            None => Span::raw(""),
+            Some(ContentPart::Space(space)) => config.item_space(space),
+            _ => unreachable!(),
+        };
 
         line_width += span.width();
+        line_width += space.width();
 
         if line_width > max_width {
-            line_width = 0;
-            let mut line = std::mem::take(&mut spans);
-            if let Some(ContentPart::Space(_)) = prev {
-                line.pop();
-            }
-            lines.push(line);
-            if !matches!(part, ContentPart::Space(_)) {
-                spans.push(span);
-            }
+            line_width = span.width();
+            lines.push(std::mem::take(&mut spans));
+            spans.push(span);
         } else {
+            spans.push(space);
             spans.push(span);
         }
     }
 
-    if let Some(ContentPart::Space(_)) = prev_part {
-        spans.pop();
-    }
-
-    let due = match item.due_date() {
-        Some(date) => config.item_due_date(*date),
-        None => Span::raw(""),
-    };
-
-    let t = match item.t_date() {
-        Some(date) => config.item_t_date(*date),
-        None => Span::raw(""),
-    };
-
-    for span in [due, t] {
+    let t = item.t_date().map(|date| config.item_t_date(*date));
+    let due = item.due_date().map(|date| config.item_due_date(*date));
+    for span in [t, due].into_iter().flatten() {
         line_width += span.width() + 1;
 
         if line_width > max_width {
             line_width = 0;
             lines.push(std::mem::take(&mut spans));
+            spans.push(span);
         } else {
             spans.push(Span::raw(" "));
             spans.push(span);
