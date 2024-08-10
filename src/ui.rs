@@ -1,15 +1,14 @@
 use ratatui::{
-    layout::{Alignment, Constraint, Layout, Margin},
-    style::{Color, Style, Styled, Stylize},
-    text::{Line, Span, Text, ToLine},
-    widgets::{Block, BorderType, List, Paragraph, Row, Table},
+    layout::{Constraint, Layout, Margin},
+    text::{Span, Text},
+    widgets::{Row, Table},
     Frame,
 };
 
 use crate::{
     app::App,
     config::Config,
-    todo::{ContentPart, TodoItem},
+    todo::{Content, TodoItem},
 };
 
 /// Renders the user interface widgets.
@@ -58,28 +57,23 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
         None => config.item_no_priority_mark(),
     };
 
-    let mut prev_part: Option<&ContentPart> = None;
     let mut spans = vec![];
     let mut line_width = 0;
     let mut lines = vec![];
+    let mut first = true;
 
     for part in item.content_parts() {
-        let prev = prev_part;
-        prev_part = Some(part);
-        let span = match part {
-            ContentPart::Word(word) => config.item_word(word),
-            ContentPart::Context(context) => config.item_context(context),
-            ContentPart::Project(project) => config.item_project(project),
-            ContentPart::Space(_)
-            | ContentPart::Rec { .. }
-            | ContentPart::Due(_)
-            | ContentPart::T(_)
-            | ContentPart::Pri(_) => continue,
+        let span = match &part.content {
+            Content::Word(word) => config.item_word(word),
+            Content::Context(context) => config.item_context(context),
+            Content::Project(project) => config.item_project(project),
+            Content::Rec { .. } | Content::Due(_) | Content::T(_) | Content::Pri(_) => continue,
         };
-        let space = match prev {
-            None => Span::raw(""),
-            Some(ContentPart::Space(space)) => config.item_space(space),
-            _ => unreachable!(),
+        let space = if first {
+            first = false;
+            Span::raw("")
+        } else {
+            config.item_space(&part.space)
         };
 
         line_width += span.width();

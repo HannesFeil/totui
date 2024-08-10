@@ -42,7 +42,8 @@ fn main() -> anyhow::Result<()> {
     };
 
     let todo_file_content = std::fs::read_to_string(&args.todo_file)?;
-    let todo_list = TodoList::parse(&todo_file_content)
+    let todo_list = todo_file_content
+        .parse()
         .or_else(|e| anyhow::bail!("Failed to parse TODO file!\n{e}"))?;
 
     // Create an application.

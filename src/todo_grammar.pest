@@ -21,4 +21,4 @@ meta          = _{ context | project | rec | due | pri | t }
 content_space = { space }
 content       = { (meta | word) ~ (content_space ~ (meta | word))* }
 
-item          = { ((completed | priority) ~ space)? ~ date ~ space ~ content }
+item          = { ((completed | priority) ~ space)? ~ date ~ (space ~ content)? }
