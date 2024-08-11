@@ -1,12 +1,13 @@
 use ratatui::{
-    layout::{Constraint, Layout, Margin},
-    text::{Span, Text},
-    widgets::{Row, Table},
+    layout::{Constraint, Layout, Margin, Rect},
+    style::{Style, Stylize},
+    text::{Line, Span, Text},
+    widgets::{Paragraph, Row, Table},
     Frame,
 };
 
 use crate::{
-    app::App,
+    app::{App, SortFilter},
     config::Config,
     todo::{Content, TodoItem},
 };
@@ -22,27 +23,56 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     ])
     .areas(frame.size());
 
-    const TABLE_WIDTHS: [Constraint; 3] = [
-        Constraint::Length(3),
-        Constraint::Length(3),
-        Constraint::Min(20),
-    ];
-    const NUM_ROWS: usize = TABLE_WIDTHS.len();
+    if let Some((x, y)) = app.cursor_pos() {
+        frame.set_cursor(x, y);
+    }
 
-    let content_width = Layout::horizontal(TABLE_WIDTHS)
+    render_sortfilter(frame, top, app.todo_list.sort_filter(), &app.config);
+
+    const NUM_COLS: usize = 3;
+    const MIN_CONTENT_WIDTH: u16 = 20;
+    let table_widths: [Constraint; NUM_COLS] = [
+        Constraint::Length(app.config.completion_width() as u16),
+        Constraint::Length(app.config.priority_width() as u16),
+        Constraint::Min(MIN_CONTENT_WIDTH),
+    ];
+
+    let content_width = Layout::horizontal(table_widths)
         .spacing(1)
-        .areas::<NUM_ROWS>(mid.inner(Margin::new(1, 0)))[2]
+        .areas::<NUM_COLS>(mid.inner(Margin::new(1, 0)))[2]
         .width as usize;
     let items = app.todo_list.items();
-    let rows = items
-        .iter()
-        .copied()
-        .map(|item| render_item_row(item, content_width, &app.config));
+    let rows = items.map(|item| render_item_row(item, content_width, &app.config));
     frame.render_stateful_widget(
-        Table::new(rows, TABLE_WIDTHS).block(app.config.default_block()),
+        Table::new(rows, table_widths).block(app.config.default_block()),
         mid,
         &mut app.state.todo_table_state,
     )
+}
+
+fn render_sortfilter(frame: &mut Frame, area: Rect, sf: &SortFilter, config: &Config) {
+    let completion = match sf.filter.completion {
+        Some(true) => config.item_complete_mark(),
+        Some(false) => config.item_incomplete_mark(),
+        None => config.filter_completion_disabled(),
+    };
+    let priority = match sf.filter.priority {
+        Some(Some(priority)) => config.item_priority_mark(priority),
+        Some(None) => config.item_no_priority_mark(),
+        None => config.filter_priority_disabled(),
+    };
+
+    frame.render_widget(config.default_block(), area);
+    let [completion_area, priority_area, t_area, input_area] = Layout::horizontal([
+        Constraint::Length(config.completion_width() as u16),
+        Constraint::Length(config.priority_width() as u16),
+        Constraint::Length(1),
+        Constraint::Min(10),
+    ])
+    .spacing(1)
+    .areas(area.inner(Margin::new(1, 1)));
+    frame.render_widget(Paragraph::new(completion), completion_area);
+    frame.render_widget(Paragraph::new(priority), priority_area);
 }
 
 fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config) -> Row<'a> {
@@ -110,5 +140,5 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
     let content = Text::from_iter(lines);
     let height = content.height() as u16;
 
-    Row::new([completion, priority, content]).height(height)
+    Row::new([completion.into(), priority.into(), content]).height(height)
 }

@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use ratatui::widgets::TableState;
+use ratatui::{
+    layout::{Margin, Rect}, style::{Style, Stylize}, widgets::{Block, TableState, Widget}
+};
+use tui_input::Input;
 
 use crate::{
     config::Config,
@@ -26,36 +29,68 @@ pub struct App {
 pub struct SortedFilteredTodoList {
     list: TodoList,
     sort_filter: SortFilter,
-    view_indices: Box<[usize]>,
+    view_indices: Vec<usize>,
 }
 
 impl SortedFilteredTodoList {
     pub fn new(list: TodoList) -> Self {
         let sort_filter = SortFilter::default();
-        let view_indices = sort_filter.apply(&list);
+        let view_indices = Vec::with_capacity(list.len());
 
-        Self {
+        let mut this = Self {
             list,
             sort_filter,
             view_indices,
-        }
+        };
+        this.update_view_indices();
+        this
     }
 
-    pub fn items(&self) -> Box<[&TodoItem]> {
-        self.view_indices
-            .iter()
-            .copied()
-            .map(|i| &self.list[i])
-            .collect()
+    fn update_view_indices(&mut self) {
+        self.view_indices.clear();
+        self.view_indices.extend(
+            self.list
+                .iter()
+                .enumerate()
+                .filter_map(|(i, item)| self.sort_filter.applies(item).then_some(i)),
+        );
+    }
+
+    pub fn items(&self) -> impl Iterator<Item = &TodoItem> {
+        self.view_indices.iter().copied().map(|i| &self.list[i])
+    }
+
+    pub fn sort_filter(&self) -> &SortFilter {
+        &self.sort_filter
     }
 }
 
 #[derive(Debug, Default)]
-pub struct SortFilter {}
+pub struct SortFilter {
+    pub filter: TodoListFilter,
+    pub sort: TodoListSort,
+}
+
+#[derive(Debug, Default)]
+pub struct TodoListFilter {
+    pub input_field: Input,
+    pub completion: Option<bool>,
+    pub priority: Option<Option<char>>,
+    pub t: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct TodoListSort {}
 
 impl SortFilter {
-    pub fn apply(&self, list: &TodoList) -> Box<[usize]> {
-        list.iter().enumerate().map(|(i, _)| i).collect()
+    pub fn applies(&self, item: &TodoItem) -> bool {
+        self.filter.applies(item)
+    }
+}
+
+impl TodoListFilter {
+    pub fn applies(&self, item: &TodoItem) -> bool {
+        true
     }
 }
 
@@ -89,5 +124,9 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn cursor_pos(&self) -> Option<(u16, u16)> {
+        None
     }
 }
