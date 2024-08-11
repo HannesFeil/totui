@@ -45,6 +45,7 @@ fn main() -> anyhow::Result<()> {
     let todo_list = todo_file_content
         .parse()
         .or_else(|e| anyhow::bail!("Failed to parse TODO file!\n{e}"))?;
+    println!("{todo_list}");
 
     // Create an application.
     let mut app = App::new(todo_list, args.archive_file, config);

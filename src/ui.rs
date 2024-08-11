@@ -52,7 +52,7 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
         config.item_incomplete_mark()
     };
 
-    let priority = match item.priority() {
+    let priority = match item.priority {
         Some(p) => config.item_priority_mark(p),
         None => config.item_no_priority_mark(),
     };
@@ -67,7 +67,6 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
             Content::Word(word) => config.item_word(word),
             Content::Context(context) => config.item_context(context),
             Content::Project(project) => config.item_project(project),
-            Content::Rec { .. } | Content::Due(_) | Content::T(_) | Content::Pri(_) => continue,
         };
         let space = if first {
             first = false;
@@ -89,8 +88,8 @@ fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config)
         }
     }
 
-    let t = item.t_date().map(|date| config.item_t_date(*date));
-    let due = item.due_date().map(|date| config.item_due_date(*date));
+    let t = item.t.map(|date| config.item_t_date(date));
+    let due = item.due.map(|date| config.item_due_date(date));
     for span in [t, due].into_iter().flatten() {
         line_width += span.width() + 1;
 
