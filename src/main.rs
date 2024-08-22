@@ -7,8 +7,7 @@ use std::path::PathBuf;
 use totui::app::App;
 use totui::config::Config;
 use totui::event::{Event, EventHandler};
-use totui::handler::handle_key_events;
-use totui::todo::TodoList;
+use totui::handler::handle_key_event;
 use totui::tui::Tui;
 
 #[derive(clap::Parser, Debug)]
@@ -45,7 +44,6 @@ fn main() -> anyhow::Result<()> {
     let todo_list = todo_file_content
         .parse()
         .or_else(|e| anyhow::bail!("Failed to parse TODO file!\n{e}"))?;
-    println!("{todo_list}");
 
     // Create an application.
     let mut app = App::new(todo_list, args.archive_file, config);
@@ -65,7 +63,7 @@ fn main() -> anyhow::Result<()> {
         // Handle events.
         match tui.events.next()? {
             Event::Tick => app.tick(),
-            Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
+            Event::Key(key_event, input) => handle_key_event(key_event, input, &mut app)?,
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
         }

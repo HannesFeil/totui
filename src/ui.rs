@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{App, SortFilter},
+    app::{App, FocusState, SortFilter},
     config::Config,
     todo::{Content, TodoItem},
 };
@@ -23,11 +23,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     ])
     .areas(frame.size());
 
-    if let Some((x, y)) = app.cursor_pos() {
-        frame.set_cursor(x, y);
-    }
-
-    render_sortfilter(frame, top, app.todo_list.sort_filter(), &app.config);
+    render_sortfilter(
+        frame,
+        top,
+        app.todo_list.sort_filter(),
+        &app.config,
+        matches!(app.state, FocusState::FilterFocus {}),
+    );
 
     const NUM_COLS: usize = 3;
     const MIN_CONTENT_WIDTH: u16 = 20;
@@ -44,13 +46,19 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let items = app.todo_list.items();
     let rows = items.map(|item| render_item_row(item, content_width, &app.config));
     frame.render_stateful_widget(
-        Table::new(rows, table_widths).block(app.config.default_block()),
+        Table::new(rows, table_widths).highlight_symbol(app.config.item_selection_mark()).block(app.config.default_block()),
         mid,
-        &mut app.state.todo_table_state,
+        &mut *app.todo_list.table_state_mut(),
     )
 }
 
-fn render_sortfilter(frame: &mut Frame, area: Rect, sf: &SortFilter, config: &Config) {
+fn render_sortfilter(
+    frame: &mut Frame,
+    area: Rect,
+    sf: &SortFilter,
+    config: &Config,
+    focused: bool,
+) {
     let completion = match sf.filter.completion {
         Some(true) => config.item_complete_mark(),
         Some(false) => config.item_incomplete_mark(),
@@ -61,18 +69,33 @@ fn render_sortfilter(frame: &mut Frame, area: Rect, sf: &SortFilter, config: &Co
         Some(None) => config.item_no_priority_mark(),
         None => config.filter_priority_disabled(),
     };
-
+    let t = if sf.filter.t {
+        config.filter_t_enabled()
+    } else {
+        config.filter_t_disabled()
+    };
+    let input = sf.filter.input_field.value();
+    
     frame.render_widget(config.default_block(), area);
     let [completion_area, priority_area, t_area, input_area] = Layout::horizontal([
         Constraint::Length(config.completion_width() as u16),
         Constraint::Length(config.priority_width() as u16),
-        Constraint::Length(1),
+        Constraint::Length(config.t_width() as u16),
         Constraint::Min(10),
     ])
     .spacing(1)
     .areas(area.inner(Margin::new(1, 1)));
     frame.render_widget(Paragraph::new(completion), completion_area);
     frame.render_widget(Paragraph::new(priority), priority_area);
+    frame.render_widget(Paragraph::new(t), t_area);
+    frame.render_widget(Paragraph::new(input), input_area);
+
+    if focused {
+        frame.set_cursor(
+            input_area.x + sf.filter.input_field.visual_cursor() as u16,
+            input_area.y,
+        );
+    }
 }
 
 fn render_item_row<'a>(item: &'a TodoItem, max_width: usize, config: &'a Config) -> Row<'a> {

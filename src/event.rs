@@ -4,6 +4,7 @@ use ratatui::crossterm::event::{
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use tui_input::InputRequest;
 
 /// Terminal events.
 #[derive(Clone, Copy, Debug)]
@@ -11,7 +12,7 @@ pub enum Event {
     /// Terminal tick.
     Tick,
     /// Key press.
-    Key(KeyEvent),
+    Key(KeyEvent, Option<InputRequest>),
     /// Mouse click/scroll.
     Mouse(MouseEvent),
     /// Terminal resize.
@@ -46,9 +47,12 @@ impl EventHandler {
 
                     if event::poll(timeout).expect("failed to poll new events") {
                         match event::read().expect("unable to read event") {
-                            CrosstermEvent::Key(e) => {
+                            event @ CrosstermEvent::Key(e) => {
                                 if e.kind == KeyEventKind::Press {
-                                    sender.send(Event::Key(e))
+                                    sender.send(Event::Key(
+                                        e,
+                                        tui_input::backend::crossterm::to_input_request(&event),
+                                    ))
                                 } else {
                                     Ok(())
                                 }

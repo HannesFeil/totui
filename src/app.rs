@@ -1,18 +1,22 @@
-use std::path::PathBuf;
-
-use ratatui::{
-    layout::{Margin, Rect}, style::{Style, Stylize}, widgets::{Block, TableState, Widget}
+use std::{
+    cell::{RefCell, RefMut},
+    path::PathBuf,
 };
+
+use chrono::Local;
+use crokey::Combiner;
+use ratatui::widgets::TableState;
 use tui_input::Input;
 
 use crate::{
     config::Config,
-    todo::{TodoItem, TodoList},
+    todo::{Content, TodoItem, TodoList},
 };
 
 /// Application.
 #[derive(Debug)]
 pub struct App {
+    pub key_combiner: Combiner,
     /// Configuration
     pub config: Config,
     /// Archive path
@@ -22,14 +26,134 @@ pub struct App {
     /// Sorted TodoList
     pub todo_list: SortedFilteredTodoList,
     /// Application state
-    pub state: State,
+    pub state: FocusState,
 }
 
 #[derive(Debug)]
 pub struct SortedFilteredTodoList {
     list: TodoList,
+    list_table_state: RefCell<TableState>,
     sort_filter: SortFilter,
     view_indices: Vec<usize>,
+}
+
+#[derive(Debug, Default)]
+pub struct SortFilter {
+    pub filter: TodoListFilter,
+    pub sort: TodoListSort,
+}
+
+#[derive(Debug)]
+pub struct TodoListFilter {
+    pub input_field: Input,
+    pub completion: Option<bool>,
+    pub priority: Option<Option<char>>,
+    pub t: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct TodoListSort {}
+
+#[derive(Debug, Default)]
+pub enum FocusState {
+    SortFocus {},
+    FilterFocus {},
+    #[default]
+    ListFocus,
+    Invalid,
+}
+
+impl App {
+    /// Constructs a new instance of [`App`].
+    pub fn new(todo_list: TodoList, archive_path: Option<PathBuf>, config: Config) -> Self {
+        Self {
+            key_combiner: Combiner::default(),
+            config,
+            archive_path,
+            running: true,
+            todo_list: SortedFilteredTodoList::new(todo_list),
+            state: FocusState::default(),
+        }
+    }
+
+    pub fn take_state(&mut self) -> FocusState {
+        std::mem::replace(&mut self.state, FocusState::Invalid)
+    }
+
+    /// Handles the tick event of the terminal.
+    pub fn tick(&self) {}
+
+    /// Set running to false to quit the application.
+    pub fn quit(&mut self) {
+        self.running = false;
+    }
+}
+
+impl SortFilter {
+    pub fn applies(&self, item: &TodoItem) -> bool {
+        self.filter.applies(item)
+    }
+}
+
+impl Default for TodoListFilter {
+    fn default() -> Self {
+        Self {
+            input_field: Input::new("".to_owned()),
+            completion: None,
+            priority: None,
+            t: true,
+        }
+    }
+}
+
+impl TodoListFilter {
+    pub fn applies(&self, item: &TodoItem) -> bool {
+        if self
+            .completion
+            .is_some_and(|c| c != item.completion_date.is_some())
+        {
+            return false;
+        }
+
+        if self.priority.is_some_and(|p| p != item.priority) {
+            return false;
+        }
+
+        if self.t {
+            if let Some(t_date) = item.t {
+                if Local::now().date_naive() < t_date {
+                    return false;
+                }
+            }
+        }
+
+        if !self.input_field.value().is_empty() {
+            let lower = self.input_field.value().to_lowercase();
+            let words: Vec<_> = lower.split_whitespace().collect();
+            let mut matched = false;
+
+            for part in item.content_parts() {
+                match &part.content {
+                    Content::Word(text) |
+                    Content::Context(text) |
+                    Content::Project(text) => {
+                        for word in &words {
+                            if text.to_lowercase().contains(word) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !matched {
+                return false
+            }
+        }
+        
+        true
+    }
 }
 
 impl SortedFilteredTodoList {
@@ -40,6 +164,7 @@ impl SortedFilteredTodoList {
         let mut this = Self {
             list,
             sort_filter,
+            list_table_state: RefCell::new(TableState::new().with_selected(0)),
             view_indices,
         };
         this.update_view_indices();
@@ -63,70 +188,13 @@ impl SortedFilteredTodoList {
     pub fn sort_filter(&self) -> &SortFilter {
         &self.sort_filter
     }
-}
 
-#[derive(Debug, Default)]
-pub struct SortFilter {
-    pub filter: TodoListFilter,
-    pub sort: TodoListSort,
-}
-
-#[derive(Debug, Default)]
-pub struct TodoListFilter {
-    pub input_field: Input,
-    pub completion: Option<bool>,
-    pub priority: Option<Option<char>>,
-    pub t: bool,
-}
-
-#[derive(Debug, Default)]
-pub struct TodoListSort {}
-
-impl SortFilter {
-    pub fn applies(&self, item: &TodoItem) -> bool {
-        self.filter.applies(item)
-    }
-}
-
-impl TodoListFilter {
-    pub fn applies(&self, item: &TodoItem) -> bool {
-        true
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct State {
-    pub todo_table_state: TableState,
-    pub focus_state: FocusState,
-}
-
-#[derive(Debug, Default)]
-pub enum FocusState {
-    #[default]
-    None,
-}
-
-impl App {
-    /// Constructs a new instance of [`App`].
-    pub fn new(todo_list: TodoList, archive_path: Option<PathBuf>, config: Config) -> Self {
-        Self {
-            config,
-            archive_path,
-            running: true,
-            todo_list: SortedFilteredTodoList::new(todo_list),
-            state: State::default(),
-        }
+    pub fn mutate_sort_filter(&mut self, f: impl FnOnce(&mut SortFilter)) {
+        f(&mut self.sort_filter);
+        self.update_view_indices();
     }
 
-    /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
-
-    /// Set running to false to quit the application.
-    pub fn quit(&mut self) {
-        self.running = false;
-    }
-
-    pub fn cursor_pos(&self) -> Option<(u16, u16)> {
-        None
+    pub fn table_state_mut(&self) -> RefMut<TableState> {
+        self.list_table_state.borrow_mut()
     }
 }
