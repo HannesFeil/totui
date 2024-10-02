@@ -33,14 +33,8 @@ pub struct App {
 pub struct SortedFilteredTodoList {
     list: TodoList,
     list_table_state: RefCell<TableState>,
-    sort_filter: SortFilter,
+    filter: TodoListFilter,
     view_indices: Vec<usize>,
-}
-
-#[derive(Debug, Default)]
-pub struct SortFilter {
-    pub filter: TodoListFilter,
-    pub sort: TodoListSort,
 }
 
 #[derive(Debug)]
@@ -89,12 +83,6 @@ impl App {
     }
 }
 
-impl SortFilter {
-    pub fn applies(&self, item: &TodoItem) -> bool {
-        self.filter.applies(item)
-    }
-}
-
 impl Default for TodoListFilter {
     fn default() -> Self {
         Self {
@@ -134,9 +122,7 @@ impl TodoListFilter {
 
             for part in item.content_parts() {
                 match &part.content {
-                    Content::Word(text) |
-                    Content::Context(text) |
-                    Content::Project(text) => {
+                    Content::Word(text) | Content::Context(text) | Content::Project(text) => {
                         for word in &words {
                             if text.to_lowercase().contains(word) {
                                 matched = true;
@@ -148,22 +134,22 @@ impl TodoListFilter {
             }
 
             if !matched {
-                return false
+                return false;
             }
         }
-        
+
         true
     }
 }
 
 impl SortedFilteredTodoList {
     pub fn new(list: TodoList) -> Self {
-        let sort_filter = SortFilter::default();
+        let filter = TodoListFilter::default();
         let view_indices = Vec::with_capacity(list.len());
 
         let mut this = Self {
             list,
-            sort_filter,
+            filter,
             list_table_state: RefCell::new(TableState::new().with_selected(0)),
             view_indices,
         };
@@ -177,20 +163,21 @@ impl SortedFilteredTodoList {
             self.list
                 .iter()
                 .enumerate()
-                .filter_map(|(i, item)| self.sort_filter.applies(item).then_some(i)),
+                .filter_map(|(i, item)| self.filter.applies(item).then_some(i)),
         );
+        self.view_indices.sort_by_key(|i| &self.list[*i]);
     }
 
     pub fn items(&self) -> impl Iterator<Item = &TodoItem> {
         self.view_indices.iter().copied().map(|i| &self.list[i])
     }
 
-    pub fn sort_filter(&self) -> &SortFilter {
-        &self.sort_filter
+    pub fn filter(&self) -> &TodoListFilter {
+        &self.filter
     }
 
-    pub fn mutate_sort_filter(&mut self, f: impl FnOnce(&mut SortFilter)) {
-        f(&mut self.sort_filter);
+    pub fn mutate_filter(&mut self, f: impl FnOnce(&mut TodoListFilter)) {
+        f(&mut self.filter);
         self.update_view_indices();
     }
 

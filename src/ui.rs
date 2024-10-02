@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{App, FocusState, SortFilter},
+    app::{App, FocusState, TodoListFilter},
     config::Config,
     todo::{Content, TodoItem},
 };
@@ -26,7 +26,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     render_sortfilter(
         frame,
         top,
-        app.todo_list.sort_filter(),
+        app.todo_list.filter(),
         &app.config,
         matches!(app.state, FocusState::FilterFocus {}),
     );
@@ -46,7 +46,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let items = app.todo_list.items();
     let rows = items.map(|item| render_item_row(item, content_width, &app.config));
     frame.render_stateful_widget(
-        Table::new(rows, table_widths).highlight_symbol(app.config.item_selection_mark()).block(app.config.default_block()),
+        Table::new(rows, table_widths)
+            .highlight_symbol(app.config.item_selection_mark())
+            .block(app.config.default_block()),
         mid,
         &mut *app.todo_list.table_state_mut(),
     )
@@ -55,27 +57,27 @@ pub fn render(app: &mut App, frame: &mut Frame) {
 fn render_sortfilter(
     frame: &mut Frame,
     area: Rect,
-    sf: &SortFilter,
+    filter: &TodoListFilter,
     config: &Config,
     focused: bool,
 ) {
-    let completion = match sf.filter.completion {
+    let completion = match filter.completion {
         Some(true) => config.item_complete_mark(),
         Some(false) => config.item_incomplete_mark(),
         None => config.filter_completion_disabled(),
     };
-    let priority = match sf.filter.priority {
+    let priority = match filter.priority {
         Some(Some(priority)) => config.item_priority_mark(priority),
         Some(None) => config.item_no_priority_mark(),
         None => config.filter_priority_disabled(),
     };
-    let t = if sf.filter.t {
+    let t = if filter.t {
         config.filter_t_enabled()
     } else {
         config.filter_t_disabled()
     };
-    let input = sf.filter.input_field.value();
-    
+    let input = filter.input_field.value();
+
     frame.render_widget(config.default_block(), area);
     let [completion_area, priority_area, t_area, input_area] = Layout::horizontal([
         Constraint::Length(config.completion_width() as u16),
@@ -92,7 +94,7 @@ fn render_sortfilter(
 
     if focused {
         frame.set_cursor(
-            input_area.x + sf.filter.input_field.visual_cursor() as u16,
+            input_area.x + filter.input_field.visual_cursor() as u16,
             input_area.y,
         );
     }

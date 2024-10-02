@@ -118,6 +118,35 @@ impl Display for TodoItem {
     }
 }
 
+impl PartialEq for TodoItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_cmp(other).is_some_and(|c| c.is_eq())
+    }
+}
+
+impl Eq for TodoItem {}
+
+impl PartialOrd for TodoItem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TodoItem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.completion_date
+            .is_some()
+            .cmp(&other.completion_date.is_some())
+            .then(match (self.priority, other.priority) {
+                (None, None) => std::cmp::Ordering::Equal,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (Some(p1), Some(p2)) => p1.cmp(&p2),
+            })
+            .then(self.creation_date.cmp(&other.creation_date))
+    }
+}
+
 impl TodoItem {
     pub fn new(creation_date: NaiveDate) -> Self {
         Self {

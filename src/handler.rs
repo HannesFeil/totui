@@ -42,13 +42,25 @@ fn handle_state(
             FocusState::SortFocus {}
         }
         FocusState::FilterFocus {} => {
-            if key == app.config.keys.cancel {
+            if [app.config.keys.cancel, app.config.keys.confirm].contains(&key) {
                 return FocusState::ListFocus;
-            }
-
-            if let Some(input) = input {
-                app.todo_list.mutate_sort_filter(|sf| {
-                    sf.filter.input_field.handle(input);
+            } else if key == app.config.keys.priority {
+                // TODO
+            } else if key == app.config.keys.completion {
+                app.todo_list.mutate_filter(|f| {
+                    f.completion = match f.completion {
+                        None => Some(true),
+                        Some(true) => Some(false),
+                        Some(false) => None,
+                    };
+                })
+            } else if key == app.config.keys.t {
+                app.todo_list.mutate_filter(|f| {
+                    f.t = !f.t;
+                })
+            } else if let Some(input) = input {
+                app.todo_list.mutate_filter(|f| {
+                    f.input_field.handle(input);
                 });
             }
 
