@@ -34,13 +34,6 @@ fn handle_state(
     state: FocusState,
 ) -> FocusState {
     match state {
-        FocusState::SortFocus {} => {
-            if key == app.config.keys.cancel {
-                return FocusState::ListFocus;
-            }
-
-            FocusState::SortFocus {}
-        }
         FocusState::FilterFocus {} => {
             if [app.config.keys.cancel, app.config.keys.confirm].contains(&key) {
                 return FocusState::ListFocus;
@@ -71,8 +64,6 @@ fn handle_state(
                 app.quit();
             } else if key == app.config.keys.focus_filter {
                 return FocusState::FilterFocus {};
-            } else if key == app.config.keys.focus_sort {
-                return FocusState::SortFocus {};
             }
 
             FocusState::ListFocus

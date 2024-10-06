@@ -16,6 +16,7 @@ use crate::{
 /// Application.
 #[derive(Debug)]
 pub struct App {
+    /// Used for input handling
     pub key_combiner: Combiner,
     /// Configuration
     pub config: Config,
@@ -29,31 +30,49 @@ pub struct App {
     pub state: FocusState,
 }
 
+/// A wrapper allowing a sorted and filtered view of a TodoList
 #[derive(Debug)]
 pub struct SortedFilteredTodoList {
+    /// The underlying list
     list: TodoList,
+    /// Table state for the ui
     list_table_state: RefCell<TableState>,
+    /// The current filter
     filter: TodoListFilter,
+    /// The list view consisting of indices into the underlying list
     view_indices: Vec<usize>,
 }
 
+/// Used to filter items in a TodoList
 #[derive(Debug)]
 pub struct TodoListFilter {
+    /// Input field of the filter
     pub input_field: Input,
+    /// Filtering for completion
+    ///
+    /// `None`        : ignore completion
+    /// `Some(true)`  : filter completed items
+    /// `Some(false)` : filter incomplete items
     pub completion: Option<bool>,
+    /// Filtering for priority
+    ///
+    /// `None`          : ignore priority
+    /// `Some(None)`    : filter items without priority
+    /// `Some(Some(p))` : filter items with priority of p
     pub priority: Option<Option<char>>,
+    /// Filtering items with threshold
     pub t: bool,
 }
 
-#[derive(Debug, Default)]
-pub struct TodoListSort {}
-
+/// State to track where the user focus is
 #[derive(Debug, Default)]
 pub enum FocusState {
-    SortFocus {},
+    /// Editing the filter
     FilterFocus {},
+    /// Browsing the list
     #[default]
     ListFocus,
+    /// Intermediate invalid state
     Invalid,
 }
 

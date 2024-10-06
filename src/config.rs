@@ -64,7 +64,6 @@ config_struct! {
     pub cancel: KeyCombination = key!(Esc),
     pub quit: KeyCombination = key!(q),
     pub focus_filter: KeyCombination = key!('/'),
-    pub focus_sort: KeyCombination = key!(s),
     pub priority: KeyCombination = key!(ctrl-p),
     pub completion: KeyCombination = key!(ctrl-d),
     pub t: KeyCombination = key!(ctrl-t),
