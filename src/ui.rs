@@ -28,7 +28,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         top,
         app.todo_list.filter(),
         &app.config,
-        matches!(app.state, FocusState::FilterFocus {}),
+        matches!(app.state, FocusState::FilterFocus { .. }),
     );
 
     const NUM_COLS: usize = 3;
@@ -45,13 +45,11 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         .width as usize;
     let items = app.todo_list.items();
     let rows = items.map(|item| render_item_row(item, content_width, &app.config));
-    frame.render_stateful_widget(
-        Table::new(rows, table_widths)
-            .highlight_symbol(app.config.item_selection_mark())
-            .block(app.config.default_block()),
-        mid,
-        &mut *app.todo_list.table_state_mut(),
-    )
+    let table = Table::new(rows, table_widths)
+        .block(app.config.default_block())
+        .highlight_style(app.config.item_selected_style())
+        .highlight_symbol(app.config.item_selection_mark());
+    frame.render_stateful_widget(table, mid, &mut *app.todo_list.table_state_mut())
 }
 
 fn render_sortfilter(

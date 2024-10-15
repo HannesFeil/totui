@@ -97,6 +97,7 @@ config_struct! {
     item_project: Style = Style::new().cyan().bold(),
     item_due: Style = Style::new().red(),
     item_t: Style = Style::new().blue(),
+    item_selected: Style = Style::new().bold(),
     // -- Filter --
     filter_disabled: Style = Style::new().gray(),
 }
@@ -199,5 +200,9 @@ impl Config {
         self.filter_t_enabled()
             .width()
             .max(self.filter_t_disabled().width())
+    }
+
+    pub fn item_selected_style(&self) -> Style {
+        self.ui.styles.item_selected
     }
 }
