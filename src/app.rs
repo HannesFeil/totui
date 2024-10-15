@@ -68,7 +68,10 @@ pub struct TodoListFilter {
 #[derive(Debug, Default)]
 pub enum FocusState {
     /// Editing the filter
-    FilterFocus {},
+    FilterFocus {
+        previous_selection_index: usize,
+        previous_selection_item: TodoItem,
+    },
     /// Browsing the list
     #[default]
     ListFocus,
@@ -187,7 +190,7 @@ impl SortedFilteredTodoList {
         self.view_indices.sort_by_key(|i| &self.list[*i]);
     }
 
-    pub fn items(&self) -> impl Iterator<Item = &TodoItem> {
+    pub fn items(&self) -> impl ExactSizeIterator<Item = &TodoItem> {
         self.view_indices.iter().copied().map(|i| &self.list[i])
     }
 

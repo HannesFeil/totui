@@ -33,7 +33,7 @@ impl Display for TodoList {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TodoItem {
     pub completion_date: Option<NaiveDate>,
     pub priority: Option<char>,
@@ -46,13 +46,13 @@ pub struct TodoItem {
     project_indices: Vec<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContentPart {
     pub space: String,
     pub content: Content,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Content {
     Word(String),
     Context(String),
